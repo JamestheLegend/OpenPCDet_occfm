@@ -328,8 +328,14 @@ def fill_trainval_infos(data_path, nusc, train_scenes, val_scenes, test=False, m
 
         ref_lidar_path, ref_boxes, _ = get_sample_data(nusc, ref_sd_token)
 
-        ref_cam_front_token = sample['data']['CAM_FRONT']
-        ref_cam_path, _, ref_cam_intrinsic = nusc.get_sample_data(ref_cam_front_token)
+        # ref_cam_front_token = sample['data']['CAM_FRONT']
+        # ref_cam_path, _, ref_cam_intrinsic = nusc.get_sample_data(ref_cam_front_token)
+
+        ref_cam_path, ref_cam_intrinsic = "", None
+        if 'CAM_FRONT' in sample['data']:
+            ref_cam_front_token = sample['data']['CAM_FRONT']
+            ref_cam_path, _, ref_cam_intrinsic = nusc.get_sample_data(ref_cam_front_token)
+
 
         # Homogeneous transform from ego car frame to reference frame
         ref_from_car = transform_matrix(
@@ -343,7 +349,9 @@ def fill_trainval_infos(data_path, nusc, train_scenes, val_scenes, test=False, m
 
         info = {
             'lidar_path': Path(ref_lidar_path).relative_to(data_path).__str__(),
-            'cam_front_path': Path(ref_cam_path).relative_to(data_path).__str__(),
+            # 'cam_front_path': Path(ref_cam_path).relative_to(data_path).__str__(),
+            # 'cam_intrinsic': ref_cam_intrinsic,
+            'cam_front_path': Path(ref_cam_path).relative_to(data_path).__str__() if ref_cam_path else "",
             'cam_intrinsic': ref_cam_intrinsic,
             'token': sample['token'],
             'sweeps': [],
