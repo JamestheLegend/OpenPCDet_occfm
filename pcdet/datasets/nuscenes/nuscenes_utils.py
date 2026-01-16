@@ -564,6 +564,43 @@ def transform_det_annos_to_nusc_annos(det_annos, nusc):
     return nusc_annos
 
 
+def compute_single_class_nds(class_mAP, trans_err, scale_err, orient_err, vel_err, attr_err, include_vel=True):
+    """
+    Compute NDS for a single class.
+    TP scores: 1 - min(1, err/cap) where caps vary by metric.
+    """
+    import math
+
+    # Handle NaN values
+    trans_err = 1.0 if (trans_err is None or math.isnan(trans_err)) else trans_err
+    scale_err = 1.0 if (scale_err is None or math.isnan(scale_err)) else scale_err
+    orient_err = 1.0 if (orient_err is None or math.isnan(orient_err)) else orient_err
+    vel_err = 1.0 if (vel_err is None or math.isnan(vel_err)) else vel_err
+    attr_err = 1.0 if (attr_err is None or math.isnan(attr_err)) else attr_err
+
+    # NuScenes TP score computation (from eval config)
+    trans_score = max(0, 1 - min(1, trans_err / 2.0))  # 2m cap
+    scale_score = max(0, 1 - min(1, scale_err))
+    orient_score = max(0, 1 - min(1, orient_err))
+    vel_score = max(0, 1 - min(1, vel_err))
+    attr_score = max(0, 1 - min(1, attr_err))
+
+    if include_vel:
+        # Standard NDS: 50% mAP, 10% each for 5 TP metrics
+        nds = (1/10) * (5 * class_mAP + trans_score + scale_score + orient_score + vel_score + attr_score)
+    else:
+        # Modified NDS without velocity: 50% mAP, 12.5% each for 4 TP metrics
+        nds = (1/8) * (5 * class_mAP + trans_score + scale_score + orient_score + attr_score)
+
+    return nds, {
+        'trans': trans_score,
+        'scale': scale_score,
+        'orient': orient_score,
+        'vel': vel_score,
+        'attr': attr_score
+    }
+
+
 def format_nuscene_results(metrics, class_names, version='default'):
     result = '----------------Nuscene %s results-----------------\n' % version
     for name in class_names:
@@ -592,5 +629,49 @@ def format_nuscene_results(metrics, class_names, version='default'):
         'mAP': metrics['mean_ap'],
         'NDS': metrics['nd_score'],
     })
+
+    # ============ Per-Class NDS Table ============
+    result += '\n' + '=' * 70 + '\n'
+    result += 'PER-CLASS NDS METRICS\n'
+    result += '=' * 70 + '\n'
+
+    # Table header
+    result += f'{"Class":<20} {"mAP":>8} {"trans":>7} {"scale":>7} {"orient":>7} {"vel":>7} {"attr":>7} {"NDS":>8} {"NDS*":>8}\n'
+    result += '-' * 70 + '\n'
+
+    per_class_details = {}
+    for name in class_names:
+        class_mAP = metrics['mean_dist_aps'].get(name, 0)
+        tp_errors = metrics['label_tp_errors'].get(name, {})
+
+        trans_err = tp_errors.get('trans_err', 1.0)
+        scale_err = tp_errors.get('scale_err', 1.0)
+        orient_err = tp_errors.get('orient_err', 1.0)
+        vel_err = tp_errors.get('vel_err', 1.0)
+        attr_err = tp_errors.get('attr_err', 1.0)
+
+        nds_with_vel, scores = compute_single_class_nds(
+            class_mAP, trans_err, scale_err, orient_err, vel_err, attr_err, include_vel=True
+        )
+        nds_no_vel, _ = compute_single_class_nds(
+            class_mAP, trans_err, scale_err, orient_err, vel_err, attr_err, include_vel=False
+        )
+
+        result += f'{name:<20} {class_mAP*100:>7.1f}% {scores["trans"]:>7.3f} {scores["scale"]:>7.3f} '
+        result += f'{scores["orient"]:>7.3f} {scores["vel"]:>7.3f} {scores["attr"]:>7.3f} '
+        result += f'{nds_with_vel*100:>7.2f}% {nds_no_vel*100:>7.2f}%\n'
+
+        per_class_details[name] = {
+            'mAP': class_mAP,
+            'NDS': nds_with_vel,
+            'NDS_no_vel': nds_no_vel,
+            'tp_scores': scores
+        }
+
+    result += '-' * 70 + '\n'
+    result += 'NDS = with velocity | NDS* = without velocity (for models without vel prediction)\n'
+    result += '=' * 70 + '\n'
+
+    details['per_class'] = per_class_details
 
     return result, details
