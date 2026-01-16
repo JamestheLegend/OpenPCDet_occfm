@@ -18,7 +18,7 @@ INFO_PATH: {
 }
 
 # Use standard NuScenes range to cover both CARLA and NuScenes data
-POINT_CLOUD_RANGE: [-40, -40, -1, 40, 40, 5.4] # [-51.2, -51.2, -5.0, 51.2, 51.2, 3.0]
+POINT_CLOUD_RANGE: [-51.2, -51.2, -5.0, 51.2, 51.2, 3.0] # [-40, -40, -1, 40, 40, 5.4] 
 
 BALANCED_RESAMPLING: False
 
