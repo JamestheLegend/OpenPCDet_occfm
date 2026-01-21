@@ -25,7 +25,12 @@ class WaymoDataset(DatasetTemplate):
         super().__init__(
             dataset_cfg=dataset_cfg, class_names=class_names, training=training, root_path=root_path, logger=logger
         )
-        self.data_path = self.root_path / self.dataset_cfg.PROCESSED_DATA_TAG
+        # Support per-mode PROCESSED_DATA_TAG (dict) or single value (string)
+        processed_data_tag = self.dataset_cfg.PROCESSED_DATA_TAG
+        if isinstance(processed_data_tag, dict):
+            processed_data_tag = processed_data_tag[self.mode]
+            print(self.mode)
+        self.data_path = self.root_path / processed_data_tag
         self.split = self.dataset_cfg.DATA_SPLIT[self.mode]
         split_dir = self.root_path / 'ImageSets' / (self.split + '.txt')
         self.sample_sequence_list = [x.strip() for x in open(split_dir).readlines()]

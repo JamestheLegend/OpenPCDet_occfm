@@ -1,7 +1,7 @@
-CLASS_NAMES: ['car']
+CLASS_NAMES: ['Vehicle']
 
 DATA_CONFIG:
-    _BASE_CONFIG_: cfgs/dataset_configs/nuscenes_carla_train_nusc_val.yaml
+    _BASE_CONFIG_: cfgs/dataset_configs/carla_waymo_dataset.yaml
 
 MODEL:
     NAME: CenterPoint
@@ -18,6 +18,7 @@ MODEL:
 
     BACKBONE_2D:
         NAME: BaseBEVBackbone
+
         LAYER_NUMS: [5, 5]
         LAYER_STRIDES: [1, 2]
         NUM_FILTERS: [128, 256]
@@ -28,16 +29,13 @@ MODEL:
         NAME: CenterHead
         CLASS_AGNOSTIC: False
 
-        # Single head for car-only detection
         CLASS_NAMES_EACH_HEAD: [
-            ['car']
+            ['Vehicle']
         ]
 
         SHARED_CONV_CHANNEL: 64
         USE_BIAS_BEFORE_NORM: True
         NUM_HM_CONV: 2
-
-        # No velocity prediction - CARLA data doesn't have velocity
         SEPARATE_HEAD_CFG:
             HEAD_ORDER: ['center', 'center_z', 'dim', 'rot']
             HEAD_DICT: {
@@ -56,25 +54,24 @@ MODEL:
         LOSS_CONFIG:
             LOSS_WEIGHTS: {
                 'cls_weight': 1.0,
-                'loc_weight': 0.25,
-                # code_weights: [x, y, z, dx, dy, dz, sin, cos] - 8 values, no velocity
+                'loc_weight': 2.0,
                 'code_weights': [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
             }
 
         POST_PROCESSING:
             SCORE_THRESH: 0.1
-            # Match point cloud range: [-51.2, -51.2, -5.0, 51.2, 51.2, 3.0]
-            POST_CENTER_LIMIT_RANGE: [-61.2, -61.2, -10.0, 61.2, 61.2, 10.0]
+            POST_CENTER_LIMIT_RANGE: [-75.2, -75.2, -2, 75.2, 75.2, 4]
             MAX_OBJ_PER_SAMPLE: 500
             NMS_CONFIG:
                 NMS_TYPE: nms_gpu
-                NMS_THRESH: 0.2
-                NMS_PRE_MAXSIZE: 1000
-                NMS_POST_MAXSIZE: 83
+                NMS_THRESH: 0.7
+                NMS_PRE_MAXSIZE: 4096
+                NMS_POST_MAXSIZE: 500
 
     POST_PROCESSING:
         RECALL_THRESH_LIST: [0.3, 0.5, 0.7]
-        EVAL_METRIC: kitti
+
+        EVAL_METRIC: waymo
 
 
 OPTIMIZATION:
